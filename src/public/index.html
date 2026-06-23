@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Template Runner</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #1a1a2e;
+      color: #e0e0e0;
+      min-height: 100vh;
+      padding: 20px;
+    }
+    .container { max-width: 900px; margin: 0 auto; }
+    h1 {
+      text-align: center;
+      margin-bottom: 30px;
+      color: #00d4aa;
+      font-size: 2em;
+    }
+    .card {
+      background: #16213e;
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 20px;
+      border: 1px solid #0f3460;
+    }
+    .card h2 {
+      color: #00d4aa;
+      margin-bottom: 16px;
+      font-size: 1.2em;
+    }
+    label {
+      display: block;
+      margin-bottom: 6px;
+      color: #a0c4ff;
+      font-size: 0.9em;
+      font-weight: 500;
+    }
+    input, select, textarea {
+      width: 100%;
+      padding: 10px 14px;
+      border: 1px solid #0f3460;
+      border-radius: 8px;
+      background: #0f3460;
+      color: #e0e0e0;
+      font-size: 14px;
+      margin-bottom: 14px;
+      transition: border-color 0.2s;
+    }
+    input:focus, select:focus, textarea:focus {
+      outline: none;
+      border-color: #00d4aa;
+    }
+    textarea {
+      min-height: 250px;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 13px;
+      line-height: 1.5;
+      resize: vertical;
+      direction: ltr;
+      text-align: left;
+    }
+    button {
+      padding: 12px 28px;
+      border: none;
+      border-radius: 8px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-load {
+      background: #0f3460;
+      color: #00d4aa;
+      border: 1px solid #00d4aa;
+    }
+    .btn-load:hover { background: #00d4aa; color: #1a1a2e; }
+    .btn-run {
+      background: #00d4aa;
+      color: #1a1a2e;
+      width: 100%;
+      font-size: 16px;
+      padding: 14px;
+    }
+    .btn-run:hover { background: #00ffcc; }
+    .btn-run:disabled { opacity: 0.5; cursor: not-allowed; }
+    .template-input {
+      display: flex;
+      gap: 10px;
+      align-items: flex-end;
+    }
+    .template-input .field { flex: 1; }
+    .template-input button { margin-bottom: 14px; }
+    .params-form { display: none; }
+    .params-form.active { display: block; }
+    .result-panel {
+      display: none;
+      margin-top: 20px;
+    }
+    .result-panel.active { display: block; }
+    .result-panel pre {
+      background: #0a0a1a;
+      padding: 16px;
+      border-radius: 8px;
+      overflow-x: auto;
+      font-size: 13px;
+      line-height: 1.5;
+      max-height: 500px;
+      overflow-y: auto;
+      direction: ltr;
+      text-align: left;
+    }
+    .result-success { border-left: 4px solid #00d4aa; }
+    .result-error { border-left: 4px solid #ff6b6b; }
+    .badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 600;
+      margin-bottom: 10px;
+    }
+    .badge-success { background: #00d4aa22; color: #00d4aa; }
+    .badge-error { background: #ff6b6b22; color: #ff6b6b; }
+    .sequence-list {
+      list-style: none;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    .sequence-list li {
+      background: #0f3460;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 12px;
+      color: #a0c4ff;
+    }
+    .spinner {
+      display: none;
+      text-align: center;
+      padding: 20px;
+    }
+    .spinner.active { display: block; }
+    .spinner::after {
+      content: '';
+      display: inline-block;
+      width: 30px;
+      height: 30px;
+      border: 3px solid #0f3460;
+      border-top-color: #00d4aa;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .info-text { color: #666; font-size: 0.85em; margin-bottom: 10px; }
+
+    /* History dropdown */
+    .history-section {
+      margin-bottom: 14px;
+    }
+    .history-section label {
+      margin-bottom: 6px;
+    }
+    .history-select {
+      width: 100%;
+      padding: 8px 12px;
+      border: 1px solid #0f3460;
+      border-radius: 8px;
+      background: #0a0a1a;
+      color: #a0c4ff;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    .history-select option {
+      background: #0a0a1a;
+      color: #e0e0e0;
+    }
+    .history-empty {
+      color: #555;
+      font-size: 0.8em;
+      font-style: italic;
+    }
+    .json-error {
+      color: #ff6b6b;
+      font-size: 0.8em;
+      margin-top: -10px;
+      margin-bottom: 10px;
+      display: none;
+    }
+    .json-error.active { display: block; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Template Runner</h1>
+
+    <!-- Load Template -->
+    <div class="card">
+      <h2>Load Template</h2>
+      <div class="template-input">
+        <div class="field">
+          <label for="templateRef">Template Reference</label>
+          <input type="text" id="templateRef" placeholder="e.g. orderCreateASAPPOOL@10" />
+        </div>
+        <button class="btn-load" onclick="loadTemplate()">Load</button>
+      </div>
+      <p class="info-text">Enter the template name with version (e.g. orderCreateASAPPOOL@10)</p>
+    </div>
+
+    <!-- Template Info & JSON Body -->
+    <div class="card params-form" id="paramsCard">
+      <h2 id="templateTitle">Template Parameters</h2>
+      <p class="info-text" id="templateInfo"></p>
+      <ul class="sequence-list" id="sequenceList"></ul>
+
+      <!-- History -->
+      <div class="history-section" id="historySection" style="display:none;">
+        <label>Recent Bodies (last 10)</label>
+        <select class="history-select" id="historySelect" onchange="loadFromHistory()">
+          <option value="">-- select from history --</option>
+        </select>
+      </div>
+
+      <!-- JSON Editor -->
+      <label for="jsonBody">Request Body (JSON)</label>
+      <textarea id="jsonBody" placeholder='{ "env": "dev", "user": { "email": "...", "password": "..." }, ... }'></textarea>
+      <div class="json-error" id="jsonError">Invalid JSON</div>
+
+      <button class="btn-run" onclick="runTemplate()" id="runBtn" disabled>Run Template</button>
+    </div>
+
+    <!-- Loading -->
+    <div class="spinner" id="spinner"></div>
+
+    <!-- Results -->
+    <div class="result-panel" id="resultPanel">
+      <div class="card" id="resultCard">
+        <h2>Result</h2>
+        <span class="badge" id="resultBadge"></span>
+        <pre id="resultBody"></pre>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const HISTORY_KEY = 'template_runner_history';
+    const MAX_HISTORY = 10;
+    let currentTemplateRef = '';
+
+    async function loadTemplate() {
+      const ref = document.getElementById('templateRef').value.trim();
+      if (!ref) return alert('Enter a template reference');
+
+      try {
+        const res = await fetch(`/templates/${encodeURIComponent(ref)}`);
+        const data = await res.json();
+
+        if (!res.ok) {
+          alert(data.error || 'Template not found');
+          return;
+        }
+
+        currentTemplateRef = ref;
+        renderParamsForm(data, ref);
+      } catch (err) {
+        alert('Error loading template: ' + err.message);
+      }
+    }
+
+    function renderParamsForm(template, ref) {
+      const card = document.getElementById('paramsCard');
+      const title = document.getElementById('templateTitle');
+      const info = document.getElementById('templateInfo');
+      const seqList = document.getElementById('sequenceList');
+
+      title.textContent = `${template.template_id || ref} (v${template.version || '?'})`;
+      info.textContent = `Sequence: ${(template.sequence || []).length} steps`;
+
+      // Render sequence steps
+      seqList.innerHTML = (template.sequence || []).map(s => `<li>${s.id}</li>`).join('');
+
+      // Generate example JSON from params_schema
+      const schema = template.params_schema || {};
+      const properties = schema.properties || {};
+      const required = schema.required || [];
+      const example = buildExampleFromSchema(properties, required);
+
+      const jsonBody = document.getElementById('jsonBody');
+      jsonBody.value = JSON.stringify(example, null, 2);
+
+      // Load history for this template
+      loadHistory(ref);
+
+      card.classList.add('active');
+      document.getElementById('runBtn').disabled = false;
+    }
+
+    function buildExampleFromSchema(properties, required) {
+      const obj = {};
+      for (const [key, prop] of Object.entries(properties)) {
+        // Handle nested keys like "user.email"
+        const parts = key.split('.');
+        let target = obj;
+        for (let i = 0; i < parts.length - 1; i++) {
+          if (!target[parts[i]] || typeof target[parts[i]] !== 'object') {
+            target[parts[i]] = {};
+          }
+          target = target[parts[i]];
+        }
+        const finalKey = parts[parts.length - 1];
+
+        if (prop.enum) {
+          target[finalKey] = prop.enum[0];
+        } else if (prop.type === 'array') {
+          if (prop.items && prop.items.properties) {
+            const itemExample = {};
+            for (const [ik, iv] of Object.entries(prop.items.properties)) {
+              itemExample[ik] = iv.type === 'number' || iv.type === 'integer' ? 0 : '';
+            }
+            target[finalKey] = [itemExample];
+          } else {
+            target[finalKey] = [];
+          }
+        } else if (prop.type === 'number' || prop.type === 'integer') {
+          target[finalKey] = 0;
+        } else {
+          target[finalKey] = '';
+        }
+      }
+      return obj;
+    }
+
+    function loadHistory(templateRef) {
+      const historySection = document.getElementById('historySection');
+      const historySelect = document.getElementById('historySelect');
+      const history = getHistory(templateRef);
+
+      if (history.length === 0) {
+        historySection.style.display = 'none';
+        return;
+      }
+
+      historySection.style.display = 'block';
+      historySelect.innerHTML = '<option value="">-- select from history --</option>';
+
+      history.forEach((entry, idx) => {
+        const opt = document.createElement('option');
+        opt.value = idx;
+        // Show a preview of the body
+        const preview = entry.length > 80 ? entry.substring(0, 80) + '...' : entry;
+        const time = getHistoryTimestamps(templateRef)[idx] || '';
+        opt.textContent = `${time ? time + ' | ' : ''}${preview}`;
+        historySelect.appendChild(opt);
+      });
+    }
+
+    function loadFromHistory() {
+      const select = document.getElementById('historySelect');
+      const idx = select.value;
+      if (idx === '') return;
+
+      const history = getHistory(currentTemplateRef);
+      if (history[idx]) {
+        document.getElementById('jsonBody').value = history[idx];
+      }
+      select.value = '';
+    }
+
+    function saveToHistory(templateRef, bodyStr) {
+      const storageKey = `${HISTORY_KEY}_${templateRef}`;
+      const tsKey = `${HISTORY_KEY}_ts_${templateRef}`;
+      let history = [];
+      let timestamps = [];
+      try {
+        history = JSON.parse(localStorage.getItem(storageKey) || '[]');
+        timestamps = JSON.parse(localStorage.getItem(tsKey) || '[]');
+      } catch {}
+
+      // Don't duplicate the same body
+      const existingIdx = history.indexOf(bodyStr);
+      if (existingIdx !== -1) {
+        history.splice(existingIdx, 1);
+        timestamps.splice(existingIdx, 1);
+      }
+
+      // Add to the front
+      const now = new Date().toLocaleString('he-IL');
+      history.unshift(bodyStr);
+      timestamps.unshift(now);
+
+      // Keep max 10
+      if (history.length > MAX_HISTORY) {
+        history = history.slice(0, MAX_HISTORY);
+        timestamps = timestamps.slice(0, MAX_HISTORY);
+      }
+
+      localStorage.setItem(storageKey, JSON.stringify(history));
+      localStorage.setItem(tsKey, JSON.stringify(timestamps));
+    }
+
+    function getHistory(templateRef) {
+      const storageKey = `${HISTORY_KEY}_${templateRef}`;
+      try {
+        return JSON.parse(localStorage.getItem(storageKey) || '[]');
+      } catch { return []; }
+    }
+
+    function getHistoryTimestamps(templateRef) {
+      const tsKey = `${HISTORY_KEY}_ts_${templateRef}`;
+      try {
+        return JSON.parse(localStorage.getItem(tsKey) || '[]');
+      } catch { return []; }
+    }
+
+    async function runTemplate() {
+      const ref = document.getElementById('templateRef').value.trim();
+      if (!ref) return;
+
+      const jsonBody = document.getElementById('jsonBody').value.trim();
+      const jsonError = document.getElementById('jsonError');
+
+      let params;
+      try {
+        params = JSON.parse(jsonBody);
+        jsonError.classList.remove('active');
+      } catch {
+        jsonError.classList.add('active');
+        return;
+      }
+
+      // Save to history
+      saveToHistory(ref, jsonBody);
+      loadHistory(ref);
+
+      const spinner = document.getElementById('spinner');
+      const resultPanel = document.getElementById('resultPanel');
+      const resultCard = document.getElementById('resultCard');
+      const resultBadge = document.getElementById('resultBadge');
+      const resultBody = document.getElementById('resultBody');
+
+      spinner.classList.add('active');
+      resultPanel.classList.remove('active');
+      document.getElementById('runBtn').disabled = true;
+
+      try {
+        const res = await fetch('/run-template', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ template_ref: ref, params })
+        });
+
+        const data = await res.json();
+
+        spinner.classList.remove('active');
+        resultPanel.classList.add('active');
+
+        if (data.ok) {
+          resultCard.className = 'card result-success';
+          resultBadge.className = 'badge badge-success';
+          resultBadge.textContent = `SUCCESS - Last step: ${data.last_successful_step}`;
+        } else {
+          resultCard.className = 'card result-error';
+          resultBadge.className = 'badge badge-error';
+          resultBadge.textContent = `FAILED - ${data.error || 'Unknown error'}`;
+        }
+
+        resultBody.textContent = JSON.stringify(data, null, 2);
+      } catch (err) {
+        spinner.classList.remove('active');
+        resultPanel.classList.add('active');
+        resultCard.className = 'card result-error';
+        resultBadge.className = 'badge badge-error';
+        resultBadge.textContent = 'Network Error';
+        resultBody.textContent = err.message;
+      } finally {
+        document.getElementById('runBtn').disabled = false;
+      }
+    }
+
+    // Validate JSON as user types
+    document.getElementById('jsonBody').addEventListener('input', () => {
+      const jsonError = document.getElementById('jsonError');
+      const val = document.getElementById('jsonBody').value.trim();
+      if (!val) { jsonError.classList.remove('active'); return; }
+      try {
+        JSON.parse(val);
+        jsonError.classList.remove('active');
+      } catch {
+        jsonError.classList.add('active');
+      }
+    });
+
+    // Allow Enter to trigger load
+    document.getElementById('templateRef').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') loadTemplate();
+    });
+  </script>
+</body>
+</html>
