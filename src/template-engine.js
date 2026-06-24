@@ -50,6 +50,11 @@ class TemplateEngine {
       const response = await fetch(url, fetchOpts);
       const responseBody = await response.text();
       const responseHeaders = Object.fromEntries(response.headers.entries());
+      
+      // Node's fetch merges set-cookie into one entry; use getSetCookie for full values
+      if (response.headers.getSetCookie && response.headers.getSetCookie().length > 0) {
+        responseHeaders['set-cookie'] = response.headers.getSetCookie().join(', ');
+      }
 
       this.logger.log(`<----------- RESPONSE for ${step.id}`);
       this.logger.log(`<-- Status: ${response.status}`);
@@ -181,22 +186,28 @@ class TemplateEngine {
 
     // Replace {{ params.xxx }} or {{ params.xxx | default(value) }}
     text = text.replace(/"?\{\{\s*params\.([^\s}|]+)(\s*\|\s*default\(([^)]+)\))?\s*\}\}"?/g, (match, path, _hasDefault, defaultValue) => {
+      const hasQuotes = match.startsWith('"') && match.endsWith('"');
       const value = this.getNestedValue(context.parameters, path);
 
       if ((value === undefined || value === null || value === '') && defaultValue) {
         if (defaultValue === 'now_ms') {
-          return String(Date.now());
+          const ts = String(Date.now());
+          return hasQuotes ? `"${ts}"` : ts;
         }
-        return defaultValue;
+        return hasQuotes ? `"${defaultValue}"` : defaultValue;
       }
 
-      if (value === undefined || value === null) return '';
+      if (value === undefined || value === null) return hasQuotes ? '""' : '';
 
-      // If value is object/array and match had quotes, return without quotes
+      // If value is object/array, return raw JSON (no wrapping quotes)
       if (typeof value === 'object') {
         return JSON.stringify(value);
       }
 
+      // Primitive value - if original had quotes, keep them
+      if (hasQuotes) {
+        return `"${String(value)}"`;
+      }
       return String(value);
     });
 
@@ -320,13 +331,23 @@ class TemplateEngine {
 
       if (assertion.source === 'header') {
         const headerName = assertion.name.toLowerCase();
-        const headers = Object.fromEntries(response.headers.entries());
-        for (const [key, val] of Object.entries(headers)) {
-          if (key.toLowerCase() === headerName) {
-            if (assertion.op === 'contains') {
-              return val.includes(String(assertion.value));
+        let headerValue = '';
+        
+        // Special handling for set-cookie (multiple values)
+        if (headerName === 'set-cookie' && response.headers.getSetCookie) {
+          headerValue = response.headers.getSetCookie().join(', ');
+        } else {
+          const headers = Object.fromEntries(response.headers.entries());
+          for (const [key, val] of Object.entries(headers)) {
+            if (key.toLowerCase() === headerName) {
+              headerValue = val;
+              break;
             }
           }
+        }
+        
+        if (assertion.op === 'contains') {
+          return headerValue.includes(String(assertion.value));
         }
         return false;
       }
